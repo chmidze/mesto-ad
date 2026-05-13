@@ -5,7 +5,11 @@
   Из index.js ничего не экспортируется.
 */
 
-import { createCardElement } from "./components/card.js";
+import {
+  createCardElement,
+  removeCardElement,
+  updateCardLikeState,
+} from "./components/card.js";
 import {
   closeModalWindow,
   openModalWindow,
@@ -63,7 +67,6 @@ const infoUserPreviewTemplate = document
 
 const openProfileFormButton = document.querySelector(".profile__edit-button");
 const openCardFormButton = document.querySelector(".profile__add-button");
-const headerLogo = document.querySelector(".header__logo");
 
 const profileTitle = document.querySelector(".profile__title");
 const profileDescription = document.querySelector(".profile__description");
@@ -146,96 +149,22 @@ const handleInfoClick = (cardId) => {
       renderInfoModalContent({
         title: "Информация о карточке",
         infoItems: [
-          { term: "Название:", description: cardData.name },
-          { term: "Автор:", description: cardData.owner?.name ?? "—" },
-          { term: "Лайков:", description: String(cardData.likes.length) },
+          { term: "Описание:", description: cardData.name },
           {
             term: "Дата создания:",
             description: formatDate(new Date(cardData.createdAt)),
           },
-        ],
-        listTitle:
-          cardData.likes.length > 0 ? "Лайкнули:" : "Лайков пока нет",
-        listItems: cardData.likes.map((user) => user.name),
-      });
-
-      openModalWindow(infoModalWindow);
-    })
-    .catch((err) => {
-      console.log(err);
-    });
-};
-
-const handleLogoClick = () => {
-  getCardList()
-    .then((cards) => {
-      if (cards.length === 0) {
-        renderInfoModalContent({
-          title: "Статистика",
-          infoItems: [{ term: "Всего карточек:", description: "0" }],
-          listTitle: "",
-          listItems: [],
-        });
-
-        openModalWindow(infoModalWindow);
-        return;
-      }
-
-      const sortedCards = [...cards].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
-
-      const firstCreatedCard = sortedCards[sortedCards.length - 1];
-      const lastCreatedCard = sortedCards[0];
-
-      const totalLikes = cards.reduce((acc, card) => acc + card.likes.length, 0);
-      const mostLikedCard = cards.reduce((best, card) => {
-        return card.likes.length > best.likes.length ? card : best;
-      }, cards[0]);
-
-      const ownersMap = new Map();
-      cards.forEach((card) => {
-        const ownerId = card.owner?._id;
-        if (!ownerId) return;
-
-        const current = ownersMap.get(ownerId);
-        ownersMap.set(ownerId, {
-          name: card.owner?.name ?? "—",
-          count: (current?.count ?? 0) + 1,
-        });
-      });
-
-      const topOwners = [...ownersMap.values()]
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
-        .map((owner) => `${owner.name} — ${owner.count}`);
-
-      renderInfoModalContent({
-        title: "Статистика",
-        infoItems: [
-          { term: "Всего карточек:", description: String(cards.length) },
-          { term: "Всего лайков:", description: String(totalLikes) },
+          { term: "Владелец:", description: cardData.owner?.name ?? "—" },
           {
-            term: "Первая создана:",
-            description: firstCreatedCard
-              ? formatDate(new Date(firstCreatedCard.createdAt))
-              : "—",
-          },
-          {
-            term: "Последняя создана:",
-            description: lastCreatedCard
-              ? formatDate(new Date(lastCreatedCard.createdAt))
-              : "—",
-          },
-          {
-            term: "Самая залайканная:",
-            description: mostLikedCard
-              ? `${mostLikedCard.name} (${mostLikedCard.likes.length})`
-              : "—",
+            term: "Количество лайков:",
+            description: String(cardData.likes.length),
           },
         ],
-        listTitle: topOwners.length > 0 ? "Топ авторы:" : "",
-        listItems: topOwners,
+        listTitle: "Лайкнули:",
+        listItems:
+          cardData.likes.length > 0
+            ? cardData.likes.map((user) => user.name)
+            : ["Пока никто"],
       });
 
       openModalWindow(infoModalWindow);
@@ -286,14 +215,11 @@ const handleAvatarFormSubmit = (evt) => {
 const handleCardLikeClick = ({ cardId, isLiked, likeButton, likeCountElement }) => {
   changeLikeCardStatus(cardId, isLiked)
     .then((updatedCardData) => {
-      const likedByMe = updatedCardData.likes.some(
-        (user) => user._id === currentUserId
+      updateCardLikeState(
+        { likeButton, likeCountElement },
+        updatedCardData.likes,
+        currentUserId
       );
-
-      likeButton.classList.toggle("card__like-button_is-active", likedByMe);
-      if (likeCountElement) {
-        likeCountElement.textContent = updatedCardData.likes.length;
-      }
     })
     .catch((err) => {
       console.log(err);
@@ -303,7 +229,7 @@ const handleCardLikeClick = ({ cardId, isLiked, likeButton, likeCountElement }) 
 const handleCardDeleteClick = ({ cardId, cardElement }) => {
   deleteCard(cardId)
     .then(() => {
-      cardElement.remove();
+      removeCardElement(cardElement);
     })
     .catch((err) => {
       console.log(err);
@@ -363,7 +289,6 @@ openCardFormButton.addEventListener("click", () => {
   openModalWindow(cardFormModalWindow);
 });
 
-headerLogo.addEventListener("click", handleLogoClick);
 
 // Инициализация данных с сервера
 Promise.all([getCardList(), getUserInfo()])
@@ -397,4 +322,3 @@ allPopups.forEach((popup) => {
 });
 
 enableValidation(validationConfig);
-
